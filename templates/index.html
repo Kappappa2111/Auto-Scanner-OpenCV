@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Document Scanner</title>
+</head>
+<body>
+    <h1>Document Scanner using FastAPI and OpenCV</h1>
+    <form id="upload-form" enctype="multipart/form-data">
+        <input type="file" id="file" name="file">
+        <button type="submit">Upload and Scan</button>
+    </form>
+    <div id="result"></div>
+    <script>
+        document.getElementById('upload-form').onsubmit = async (event) => {
+            event.preventDefault();
+            const fileInput = document.getElementById('file');
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            const response = await fetch('/uploadfile/', {
+                method: 'POST',
+                body: formData
+            });
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `<h2>Scanned Document</h2><img src="${url}" alt="Scanned Document">`;
+
+            // OCR request
+            const ocrResponse = await fetch('/ocr', {
+                method: 'POST',
+                body: formData
+            });
+            const ocrResult = await ocrResponse.json();
+            resultDiv.innerHTML += `<h2>OCR Text</h2><p>${ocrResult.data}</p>`;
+        };
+    </script>
+</body>
+</html>
