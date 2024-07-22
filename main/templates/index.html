@@ -20,10 +20,9 @@
                 method: 'POST',
                 body: formData
             });
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
+            const result = await response.json();
             const resultDiv = document.getElementById('result');
-            resultDiv.innerHTML = `<h2>Scanned Document</h2><img src="${url}" alt="Scanned Document">`;
+            resultDiv.innerHTML = `<h2>Scanned Document</h2><a href="${result.download_url}" download>Download Scanned Image</a>`;
 
             // OCR request
             const ocrResponse = await fetch('/ocr', {
