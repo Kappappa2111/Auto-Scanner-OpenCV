@@ -36,7 +36,7 @@ def create_pdf(image_list):
 
 def scan_and_generate_pdf(image_bytes):
     # Convert bytes to image
-    image = Image.open(BytesIO(image_bytes))  # Ensure PIL is imported correctly
+    image = Image.open(BytesIO(image_bytes))
     scanned_image = scan_document(np.array(image))
 
     # Save scanned image temporarily
