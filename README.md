@@ -1,1 +1,1 @@
-# Auto-Scanner-OpenCV
+# Document Scanner
