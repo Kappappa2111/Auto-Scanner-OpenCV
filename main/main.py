@@ -1,73 +1,52 @@
-import cv2
+from PIL import Image
 import numpy as np
-import pytesseract
-
-def find_document_contour(image):
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    edged = cv2.Canny(blurred, 75, 200)
-
-    # Hiển thị các bước trung gian để kiểm tra
-    cv2.imshow('Gray', gray)
-    cv2.imshow('Blurred', blurred)
-    cv2.imshow('Edged', edged)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-    contours, _ = cv2.findContours(edged, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-    contours = sorted(contours, key=cv2.contourArea, reverse=True)[:5]
-
-    for contour in contours:
-        peri = cv2.arcLength(contour, True)
-        approx = cv2.approxPolyDP(contour, 0.02 * peri, True)
-        if len(approx) == 4:
-            return approx
-
-    return None
+import cv2
+from skimage.filters import threshold_local
+from io import BytesIO
+import os
+import datetime
+import time
+from pathlib import Path
 
 def scan_document(image):
-    doc_contour = find_document_contour(image)
+    img = Image.fromarray(image)
+    img = cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2BGR)
     
-    if doc_contour is None:
-        raise ValueError("Document contour not found")
+    # Process image
+    imgr = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    t = threshold_local(imgr, 17, offset=15, method='gaussian')
+    imgr = (imgr > t).astype('uint8') * 255
     
-    pts = doc_contour.reshape(4, 2)
-    rect = np.zeros((4, 2), dtype="float32")
+    return imgr
 
-    s = pts.sum(axis=1)
-    rect[0] = pts[np.argmin(s)]
-    rect[2] = pts[np.argmax(s)]
+def create_pdf(image_list):
+    pdf_c = 0
+    repn = Path('Scanned_PDF')
+    if not repn.is_dir():
+        os.mkdir('Scanned_PDF')
 
-    diff = np.diff(pts, axis=1)
-    rect[1] = pts[np.argmin(diff)]
-    rect[3] = pts[np.argmax(diff)]
+    pdf_images = [Image.open(img).convert('RGB') for img in image_list]
+    ts = time.time()
+    timeStam = datetime.datetime.fromtimestamp(ts).strftime('%H:%M:%S')
+    Hour, Minute, Second = timeStam.split(":")
+    pdf_path = f'./Scanned_PDF/Scanned_{pdf_c}_{Hour}_{Minute}_{Second}.pdf'
+    pdf_images[0].save(pdf_path, save_all=True, append_images=pdf_images[1:])
 
-    (tl, tr, br, bl) = rect
-    widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
-    widthB = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
-    maxWidth = max(int(widthA), int(widthB))
+    return pdf_path
 
-    heightA = np.sqrt(((tr[0] - br[0]) ** 2) + ((tr[1] - br[1]) ** 2))
-    heightB = np.sqrt(((tl[0] - bl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
-    maxHeight = max(int(heightA), int(heightB))
+def scan_and_generate_pdf(image_bytes):
+    # Convert bytes to image
+    image = Image.open(BytesIO(image_bytes))  # Ensure PIL is imported correctly
+    scanned_image = scan_document(np.array(image))
 
-    dst = np.array([
-        [0, 0],
-        [maxWidth - 1, 0],
-        [maxWidth - 1, maxHeight - 1],
-        [0, maxHeight - 1]], dtype="float32")
-
-    M = cv2.getPerspectiveTransform(rect, dst)
-    scanned = cv2.warpPerspective(image, M, (maxWidth, maxHeight))
-
-    return scanned
-
-def get_text(image):
-    text = pytesseract.image_to_string(image)
-    return text
-
-# Sử dụng ví dụ:
-# image = cv2.imread('path_to_your_image.jpg')
-# scanned_image = scan_document(image)
-# text = get_text(scanned_image)
-# print(text)
+    # Save scanned image temporarily
+    temp_img_path = 'temp_scanned_image.jpg'
+    cv2.imwrite(temp_img_path, scanned_image)
+    
+    # Generate PDF
+    pdf_path = create_pdf([temp_img_path])
+    
+    # Clean up
+    os.remove(temp_img_path)
+    
+    return pdf_path
